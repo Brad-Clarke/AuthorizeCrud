@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using ModelAuthorization.Enums;
 using ModelAuthorization.Extensions.EntityFrameworkCore.Masking;
+using ModelAuthorization.Extensions.EntityFrameworkCore.Options;
 using System.Collections;
 using System.ComponentModel;
 using System.Linq.Expressions;
@@ -14,126 +15,156 @@ namespace ModelAuthorization.Extensions.EntityFrameworkCore
     {
         private readonly ICrudAuthorizationPolicyProvider _authorizationProvider;
 
-        private readonly DbSet<TEntity> _innerDbSet;
+        private readonly IAuthorizedDbSetOptions _options;
 
-        public override IEntityType EntityType => _innerDbSet.EntityType;
+        private readonly DbSet<TEntity> _internalDbSet;
 
-        public AuthorizedDbSet(DbSet<TEntity> innerDbSet, ICrudAuthorizationPolicyProvider authorizationProvider)
+        public override IEntityType EntityType => _internalDbSet.EntityType;
+
+        public AuthorizedDbSet(DbSet<TEntity> internalDbSet, IAuthorizedDbSetOptions options, ICrudAuthorizationPolicyProvider authorizationProvider)
         {
-            _innerDbSet = innerDbSet;
+            _internalDbSet = internalDbSet;
             _authorizationProvider = authorizationProvider;
+            _options = options;
         }
 
         public override IAsyncEnumerable<TEntity> AsAsyncEnumerable()
-            => _innerDbSet.AsAsyncEnumerable();
+            => _internalDbSet.AsAsyncEnumerable();
 
         public override IAsyncEnumerator<TEntity> GetAsyncEnumerator(CancellationToken cancellationToken = default)
-                => new MaskingAsyncEnumerator<TEntity>(_innerDbSet.GetAsyncEnumerator(cancellationToken), _authorizationProvider.MaskingHandler);
+                => new MaskingAsyncEnumerator<TEntity>(_internalDbSet.GetAsyncEnumerator(cancellationToken), _authorizationProvider.MaskingHandler);
 
         public override IQueryable<TEntity> AsQueryable()
-            => _innerDbSet.AsQueryable();
+            => _internalDbSet.AsQueryable();
 
         public override LocalView<TEntity> Local
-            => _innerDbSet.Local;
+            => _internalDbSet.Local;
 
         public override TEntity? Find(params object?[]? keyValues)
-            => _innerDbSet.Find(keyValues);
+            => _internalDbSet.Find(keyValues);
 
         public override ValueTask<TEntity?> FindAsync(params object?[]? keyValues)
-            => _innerDbSet.FindAsync(keyValues);
+            => _internalDbSet.FindAsync(keyValues);
 
         public override ValueTask<TEntity?> FindAsync(object?[]? keyValues, CancellationToken cancellationToken)
-            => _innerDbSet.FindAsync(keyValues, cancellationToken);
+            => _internalDbSet.FindAsync(keyValues, cancellationToken);
 
         public override EntityEntry<TEntity> Add(TEntity entity)
         {
-            _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Create).GetAwaiter().GetResult();
+            _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Create).GetAwaiter().GetResult();
 
-            return _innerDbSet.Add(entity);
+            return _internalDbSet.Add(entity);
         }
 
         public override async ValueTask<EntityEntry<TEntity>> AddAsync(TEntity entity, CancellationToken cancellationToken = default)
         {
-            await _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Create);
+            await _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Create);
 
-            return await _innerDbSet.AddAsync(entity, cancellationToken);
+            return await _internalDbSet.AddAsync(entity, cancellationToken);
         }
 
         public override EntityEntry<TEntity> Attach(TEntity entity)
-            => _innerDbSet.Attach(entity);
+            => _internalDbSet.Attach(entity);
 
         public override EntityEntry<TEntity> Remove(TEntity entity)
         {
-            _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Delete).GetAwaiter().GetResult();
+            _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Delete).GetAwaiter().GetResult();
 
-            return _innerDbSet.Remove(entity);
+            return _internalDbSet.Remove(entity);
         }
 
         public override EntityEntry<TEntity> Update(TEntity entity)
-            => _innerDbSet.Update(entity);
+        {
+            EntityEntry<TEntity> entry = _internalDbSet.Update(entity);
+
+            foreach (var propertyEntry in entry.Properties.Where(p => p.IsModified))
+            {
+                if (_authorizationProvider.AuthorizePropertyAsync(typeof(TEntity), propertyEntry.Metadata.PropertyInfo!, CrudPermission.Update).GetAwaiter().GetResult())
+                {
+                    continue;
+                }
+
+                if (_options.ThrowOnRestrictedPropertyUpdated)
+                {
+                    throw new UnauthorizedAccessException($"The Current User is not Authorized to perform an Update operation on {typeof(TEntity).Name}.");
+                }
+
+                propertyEntry.IsModified = false;
+            }
+
+            return entry;
+        }
 
         public override void AddRange(params TEntity[] entities)
-            => _innerDbSet.AddRange(entities);
+            => _internalDbSet.AddRange(entities);
 
         public override Task AddRangeAsync(params TEntity[] entities)
-            => _innerDbSet.AddRangeAsync(entities);
+            => _internalDbSet.AddRangeAsync(entities);
 
         public override void AttachRange(params TEntity[] entities)
-            => _innerDbSet.AttachRange(entities);
+            => _internalDbSet.AttachRange(entities);
 
         public override void RemoveRange(params TEntity[] entities)
-            => _innerDbSet.RemoveRange(entities);
+            => _internalDbSet.RemoveRange(entities);
 
         public override void UpdateRange(params TEntity[] entities)
-            => _innerDbSet.UpdateRange();
+        {
+            foreach (TEntity entity in entities)
+            {
+                Update(entity);
+            }
+        }
 
         public override void AddRange(IEnumerable<TEntity> entities)
         {
-            _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Create).GetAwaiter().GetResult();
+            _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Create).GetAwaiter().GetResult();
 
-            _innerDbSet.AddRange(entities);
+            _internalDbSet.AddRange(entities);
         }
 
         public override async Task AddRangeAsync(
             IEnumerable<TEntity> entities,
             CancellationToken cancellationToken = default)
         {
-            await _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Create);
+            await _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Create);
 
-            await _innerDbSet.AddRangeAsync(entities, cancellationToken);
+            await _internalDbSet.AddRangeAsync(entities, cancellationToken);
         }
 
         public override void AttachRange(IEnumerable<TEntity> entities)
-            => _innerDbSet.AttachRange(entities);
+            => _internalDbSet.AttachRange(entities);
 
 
         public override void RemoveRange(IEnumerable<TEntity> entities)
         {
-            _authorizationProvider.AuthorizeAsync<TEntity>(CrudPermission.Delete).GetAwaiter().GetResult();
+            _authorizationProvider.AuthorizeTypeAsync(typeof(TEntity), CrudPermission.Delete).GetAwaiter().GetResult();
 
-            _innerDbSet.RemoveRange(entities);
+            _internalDbSet.RemoveRange(entities);
         }
 
 
         public override void UpdateRange(IEnumerable<TEntity> entities)
-            => _innerDbSet.UpdateRange(entities);
-
-
+        {
+            foreach (TEntity entity in entities)
+            {
+                Update(entity);
+            }
+        }
 
         Type IQueryable.ElementType
-            => ((IQueryable<TEntity>)_innerDbSet).ElementType;
+            => ((IQueryable<TEntity>)_internalDbSet).ElementType;
 
         Expression IQueryable.Expression
-            => ((IQueryable<TEntity>)_innerDbSet).Expression;
+            => ((IQueryable<TEntity>)_internalDbSet).Expression;
 
         IQueryProvider IQueryable.Provider
-            => new MaskingAsyncQueryProvider(((IQueryable<TEntity>)_innerDbSet).Provider, _authorizationProvider.MaskingHandler);
+            => new MaskingAsyncQueryProvider(((IQueryable<TEntity>)_internalDbSet).Provider, _authorizationProvider.MaskingHandler);
 
         IServiceProvider IInfrastructure<IServiceProvider>.Instance
-            => ((IInfrastructure<IServiceProvider>)_innerDbSet).Instance;
+            => ((IInfrastructure<IServiceProvider>)_internalDbSet).Instance;
 
         IList IListSource.GetList()
-            => ((IListSource)_innerDbSet).GetList();
+            => ((IListSource)_internalDbSet).GetList();
 
     }
 }

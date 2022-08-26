@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Internal;
+using ModelAuthorization.Extensions.EntityFrameworkCore.Options;
 using System.Collections.Concurrent;
 using System.Reflection;
 
@@ -13,10 +14,13 @@ namespace ModelAuthorization.Extensions.EntityFrameworkCore.Infrastructure
 
         private readonly ConcurrentDictionary<(Type Type, string? Name), Func<DbContext, string?, object>> _cache = new();
 
+        private readonly IAuthorizedDbSetOptions _options;
+
         private readonly ICrudAuthorizationPolicyProvider _policyProvider;
 
-        public AuthorizedDbSetSource(ICrudAuthorizationPolicyProvider policyProvider)
+        public AuthorizedDbSetSource(IAuthorizedDbSetOptions options, ICrudAuthorizationPolicyProvider policyProvider)
         {
+            _options = options;
             _policyProvider = policyProvider;
         }
 
@@ -31,11 +35,11 @@ namespace ModelAuthorization.Extensions.EntityFrameworkCore.Infrastructure
                 (type, name),
                 (t, createMethod) => (Func<DbContext, string?, object>)createMethod
                     .MakeGenericMethod(t.Type)
-                    .Invoke(null, new[] { _policyProvider })!,
+                    .Invoke(null, new object[] { _options, _policyProvider })!,
                 createMethod)(context, name);
 
-        private static Func<DbContext, string?, object> CreateSetFactory<TEntity>(ICrudAuthorizationPolicyProvider policyProvider)
+        private static Func<DbContext, string?, object> CreateSetFactory<TEntity>(IAuthorizedDbSetOptions options, ICrudAuthorizationPolicyProvider policyProvider)
             where TEntity : class
-            => (c, name) => new InternalDbSet<TEntity>(c, name).ToAuthorizedDbSet(policyProvider);
+            => (c, name) => new InternalDbSet<TEntity>(c, name).ToAuthorizedDbSet(options, policyProvider);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using ModelAuthorization.Extensions.EntityFrameworkCore.Options;
 
 namespace ModelAuthorization.Extensions.EntityFrameworkCore.Infrastructure
 {
@@ -7,16 +8,20 @@ namespace ModelAuthorization.Extensions.EntityFrameworkCore.Infrastructure
     {
         private DbContextOptionsExtensionInfo? _info;
 
+        private readonly IAuthorizedDbSetOptions _options;
+
         private readonly IServiceProvider _services;
 
-        public ModelAuthorizationOptionsExtensions(IServiceProvider services)
+        public ModelAuthorizationOptionsExtensions(IAuthorizedDbSetOptions options, IServiceProvider services)
         {
+            _options = options;
             _services = services;
         }
 
         public void ApplyServices(IServiceCollection services)
         {
             services.AddScoped(_ => _services.GetRequiredService<ICrudAuthorizationPolicyProvider>());
+            services.AddScoped(_ => _options);
         }
 
         public void Validate(IDbContextOptions options)

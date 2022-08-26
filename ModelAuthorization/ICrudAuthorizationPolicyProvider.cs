@@ -10,11 +10,7 @@ namespace ModelAuthorization
     {
         IMaskingHandler MaskingHandler { get; }
 
-        ValueTask AuthorizeAsync<T>(CrudPermission permissions);
-
-        ValueTask<bool> IsAuthorizedForClassAsync<T>(CrudPermission permissions);
-        ValueTask<bool> IsAuthorizedForClassAsync(Type type, CrudPermission permissions);
-        ValueTask<bool> IsAuthorizedForPropertyAsync<T>(PropertyInfo property, CrudPermission permissions);
-        ValueTask<bool> IsAuthorizedForPropertyAsync(Type type, PropertyInfo property, CrudPermission permissions);
+        ValueTask<bool> AuthorizeTypeAsync(Type type, CrudPermission permissions);
+        ValueTask<bool> AuthorizePropertyAsync(Type type, PropertyInfo property, CrudPermission permissions);
     }
 }

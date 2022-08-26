@@ -8,14 +8,13 @@ namespace WebApplication1.Domain
     {
         public Guid Id { get; set; }
 
-        [RestrictCrud(CrudPermission.Read)]
+        [RestrictCrud(CrudPermission.Update)]
         public string UserName { get; set; }
 
         public string FirstName { get; set; }
 
         public string Email { get; set; }
 
-        [RestrictCrud(CrudPermission.Read)]
         public DateTime BirthDate { get; set; }
     }
 }

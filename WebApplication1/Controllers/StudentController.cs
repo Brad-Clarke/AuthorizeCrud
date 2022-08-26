@@ -29,6 +29,16 @@ namespace WebApplication1.Controllers
             return Ok();
         }
 
+        [HttpPatch]
+        public async Task<IActionResult> UpdateAsync([FromBody] StudentModel student)
+        {
+            _context.Students.Update(student);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(student);
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAsync([FromRoute] Guid id)
         {

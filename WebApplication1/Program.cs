@@ -18,10 +18,10 @@ namespace WebApplication1
             builder.Services.AddSwaggerGen();
             builder.Services.AddScoped<ICrudAuthorizationPolicyProvider>(_ => new BasicCrudAuthorizationPolicyProvider("user.admin"));
 
-            builder.Services.AddDbContext<StudentDbContext>((p, o) =>
+            builder.Services.AddDbContext<StudentDbContext>(options =>
             {
-                o.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=ModelAuthorizationTesting;Trusted_Connection=True;MultipleActiveResultSets=true;Integrated Security=True");
-                o.UseModelAuthorization();
+                options.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=ModelAuthorizationTesting;Trusted_Connection=True;MultipleActiveResultSets=true;Integrated Security=True");
+                options.UseModelAuthorization();
             });
 
             var app = builder.Build();

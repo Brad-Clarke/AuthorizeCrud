@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ModelAuthorization.Masking
 {
-    internal class DefaultMaskingHandler : IMaskingHandler
+    public class DefaultMaskingHandler : IMaskingHandler
     {
         private readonly ICrudAuthorizationPolicyProvider _policyProvider;
 
@@ -24,9 +24,11 @@ namespace ModelAuthorization.Masking
                 return value;
             }
 
+            Type type = typeof(T);
+
             foreach (PropertyInfo property in typeof(T).GetPublicProperties())
             {
-                if (await _policyProvider.IsAuthorizedForPropertyAsync<T>(property, CrudPermission.Read))
+                if (await _policyProvider.AuthorizePropertyAsync(type, property, CrudPermission.Read))
                 {
                     continue;
                 }
@@ -44,11 +46,13 @@ namespace ModelAuthorization.Masking
                 return values;
             }
 
+            Type type = typeof(T);
+
             T?[] valueArray = values.ToArray();
 
             foreach (PropertyInfo property in typeof(T).GetPublicProperties())
             {
-                if (await _policyProvider.IsAuthorizedForPropertyAsync<T>(property, CrudPermission.Read))
+                if (await _policyProvider.AuthorizePropertyAsync(type, property, CrudPermission.Read))
                 {
                     continue;
                 }
@@ -96,7 +100,7 @@ namespace ModelAuthorization.Masking
 
             foreach (PropertyInfo property in value.GetType().GetPublicProperties())
             {
-                if (await _policyProvider.IsAuthorizedForPropertyAsync(type, property, CrudPermission.Read))
+                if (await _policyProvider.AuthorizePropertyAsync(type, property, CrudPermission.Read))
                 {
                     continue;
                 }

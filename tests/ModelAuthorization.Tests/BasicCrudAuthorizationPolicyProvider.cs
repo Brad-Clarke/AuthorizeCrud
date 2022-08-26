@@ -42,7 +42,7 @@ namespace ModelAuthorization.Tests
         {
             ICrudAuthorizationPolicyProvider provider = new BasicCrudAuthorizationPolicyProvider(policy);
 
-            bool result = await provider.IsAuthorizedForClassAsync<TestClass>(permissions);
+            bool result = await provider.AuthorizeTypeAsync(typeof(TestClass), permissions);
 
             result.ShouldBe(isAuthorized);
         }
@@ -80,7 +80,7 @@ namespace ModelAuthorization.Tests
 
             property.ShouldNotBeNull();
 
-            bool result = await provider.IsAuthorizedForPropertyAsync<TestClass>(property, permissions);
+            bool result = await provider.AuthorizePropertyAsync(typeof(TestClass), property, permissions);
 
             result.ShouldBe(isAuthorized);
         }
